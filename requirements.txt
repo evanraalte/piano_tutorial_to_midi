@@ -1,0 +1,4 @@
+pyside6
+pytube
+opencv-python
+yaml
