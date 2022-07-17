@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QLabel,
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage, QPixmap, QPainter
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -39,8 +39,9 @@ class VideoPlayer(QWidget):
         layout.addWidget(self.frame_slider)
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
+        self.load_video("Downloads/Speech Bubbles - The Smile [Piano Cover].mp4")
 
-    def convert_cv_qt(self, cv_img):
+    def convert_cv_qt(self, cv_img) -> QPixmap:
         """Convert from an opencv image to QPixmap"""
         rgb_image = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_image.shape
@@ -53,10 +54,17 @@ class VideoPlayer(QWidget):
         logger.info(frame_num)
         self.cap.set(1, frame_num)
         _, frame = self.cap.read()
-        self.image_label.setPixmap(self.convert_cv_qt(frame))
+        pix = QPixmap(self.IMAGE_WIDTH, self.IMAGE_HEIGHT)
+        with QPainter(pix) as painter:
+            # Use QRubberband
+            # https://stackoverflow.com/questions/13840289/how-to-use-qrubberband-with-qrect-class-in-pyqt
+            # just use it and then draw the overlay
+            painter.drawPixmap(0, 0, self.convert_cv_qt(frame))
+            painter.setPen("Red")
+            painter.drawRect(15, 15, 100, 100)
+            self.image_label.setPixmap(pix)
 
     def load_video(self, path: str):
-        path = "Downloads/Speech Bubbles - The Smile [Piano Cover].mp4"
         self.cap = cv2.VideoCapture(str(path))
         self.frame_slider.setMinimum(0)
         self.frame_slider.setMaximum(self.cap.get(7))
