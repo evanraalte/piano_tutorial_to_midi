@@ -12,16 +12,40 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QSlider,
 )
+from cv2 import COLOR_BGR2GRAY
 from Color import Color
 import cv2
+import random
+import numpy
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
+class QPiano(QPainter):
+    notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+    def set_attributes(self):
+        self.num_keys = 88
+        self.start_note = self.notes[0]
+        self.x = 0
+        self.w = 852
+        self.y = 200
+        self.h = 100
+
+    def draw(self):
+        self.setPen("Red")
+        self.drawRect(self.x, self.y, self.w, self.h)
+
+        # key_width = int(self.w / self.num_keys)
+        # self.setPen("Green")
+        # for x in range(self.x, self.x + self.w, key_width):
+        #     self.drawRect(x, self.y, key_width, self.h)
+
+
 class VideoPlayer(QWidget):
-    IMAGE_WIDTH = 852
-    IMAGE_HEIGHT = 480
+    IMAGE_WIDTH = 1280
+    IMAGE_HEIGHT = 720
 
     def __init__(self):
         super(VideoPlayer, self).__init__()
@@ -54,14 +78,24 @@ class VideoPlayer(QWidget):
         logger.info(frame_num)
         self.cap.set(1, frame_num)
         _, frame = self.cap.read()
+        Y_OFFSET = 450
+        frame_cropped = frame[:][Y_OFFSET : Y_OFFSET + 225]
+        frame_grey = cv2.cvtColor(frame_cropped, COLOR_BGR2GRAY)
+        ret, frame_tresh = cv2.threshold(frame_grey, 170, 255, 0)
+        contours_white, hierarchy = cv2.findContours(
+            frame_tresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE, offset=(0, Y_OFFSET)
+        )
+        contours_black, hierarchy = cv2.findContours(
+            cv2.bitwise_not(frame_tresh), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE, offset=(0, Y_OFFSET)
+        )
+        for contour in contours_white + contours_black:
+            color = tuple(random.choices(range(100, 256), k=3))
+            cv2.drawContours(frame, [contour], -1, color, thickness=cv2.FILLED)
+
         pix = QPixmap(self.IMAGE_WIDTH, self.IMAGE_HEIGHT)
         with QPainter(pix) as painter:
-            # Use QRubberband
             # https://stackoverflow.com/questions/13840289/how-to-use-qrubberband-with-qrect-class-in-pyqt
-            # just use it and then draw the overlay
             painter.drawPixmap(0, 0, self.convert_cv_qt(frame))
-            painter.setPen("Red")
-            painter.drawRect(15, 15, 100, 100)
             self.image_label.setPixmap(pix)
 
     def load_video(self, path: str):
