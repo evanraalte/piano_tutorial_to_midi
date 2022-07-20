@@ -5,12 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "App",
             "type": "python",
             "request": "launch",
             "program": "app.py",
             "console": "integratedTerminal",
             "justMyCode": true
-        }
+        },
+        {
+            "name": "Median filtering",
+            "type": "python",
+            "request": "launch",
+            "program": "median_filtering.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
     ]
 }
