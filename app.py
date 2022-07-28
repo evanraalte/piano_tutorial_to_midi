@@ -23,7 +23,7 @@ class MainWindow(QMainWindow):
         self.download_bar = DownloadBar()
         self.bottom_layout = BottomLayout()
         # Glue
-        self.download_bar.signal_download_complete.connect(self.bottom_layout.video_player.load_video)
+        # self.download_bar.signal_download_complete.connect(self.bottom_layout.video_player.load_video)
 
         layout.addWidget(self.download_bar, 0, 0, 1, 3)
         # layout.addWidget(Color('green'), 0, 3)

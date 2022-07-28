@@ -6,9 +6,19 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QLabel,
 )
+import PySide6 as PySide6
 from PySide6.QtCore import Qt, QRect, QSize, QPoint, Signal, QObject
-from PySide6.QtGui import QImage, QPixmap, QPainter, QPainterPath, QBrush, QColor, QFontMetrics
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QSlider, QPushButton, QRubberBand, QHBoxLayout, QGridLayout
+from PySide6.QtGui import QImage, QPixmap, QPainter, QPainterPath, QBrush, QColor, QFontMetrics, QPalette
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QSlider,
+    QPushButton,
+    QRubberBand,
+    QHBoxLayout,
+    QGridLayout,
+    QComboBox,
+)
 from cv2 import COLOR_BGR2GRAY
 from Color import Color
 import cv2
@@ -17,21 +27,23 @@ import numpy as np
 from itertools import cycle, islice
 from enum import Enum
 import collections
+from functools import partial
+from Noterator import Notes, Note, Noterator
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-notes = cycle(["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"])
+# notes = cycle(["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"])
 
 
-def find_start_note(notes):
-    if len(notes) < 12:
-        raise Exception("Need at least 12 notes to determine the start note")
+def find_start_note(notes) -> Notes:
+    if len(notes) < len(Notes):
+        raise Exception(f"Need at least {len(Notes)} notes to determine the start note")
     c_note = [n for n in "WBWBWWBWBWBW"]
     reference = collections.deque(c_note)
-    for count in range(0, 12):
+    for count in range(0, len(Notes)):
         if notes[0 : len(c_note)] == list(reference):
-            return count
+            return Notes(count)
         reference.rotate(-1)
     raise Exception("Start note not found")
 
@@ -52,28 +64,9 @@ def get_median_filtered_mask(signal, threshold=30):
     # return signal[mask]
 
 
-class Note(Enum):
-    C = 0
-    Db = 1
-    D = 2
-    Eb = 3
-    E = 4
-    F = 5
-    Gb = 6
-    G = 7
-    Ab = 8
-    A = 9
-    Bb = 10
-    B = 11
-
-
 @dataclass
-class Key:
+class Contour:
     SATURATION_MAX = 255
-    note: Note
-    note_number: int
-    capture_width: int  # for scaling to contours
-    capture_height: int
     contour: np.array
 
     color: QColor = field(init=False, default=QColor.fromHsl(29, 255, 127))
@@ -81,9 +74,9 @@ class Key:
     def __post_init__(self):
         pass
 
-    def as_qpoints(self, image: QLabel):
-        sfw = self.capture_width / image.width()
-        sfh = self.capture_height / image.height()
+    def as_qpoints(self, image: QLabel, cap_width: int, cap_height: int):
+        sfw = cap_width / image.width()
+        sfh = cap_height / image.height()
         return [QPoint(c[0, 0] // sfw, c[0, 1] // sfh) for c in self.contour]
 
 
@@ -112,7 +105,8 @@ class LabelWithRubberband(QLabel):
 
 
 class VideoAnalyzer(QObject):
-    signal_keys_detected = Signal(dict)
+    signal_contours_detected = Signal(dict)
+    signal_start_note_updated = Signal(Notes)
 
     def __init__(self, width, height):
         super(VideoAnalyzer, self).__init__()
@@ -142,7 +136,7 @@ class VideoAnalyzer(QObject):
     def frame_height(self):
         return len(self.frame)
 
-    def detect_keys(self, origin: QPoint, end_point: QPoint):
+    def detect_contours(self, origin: QPoint, end_point: QPoint):
         if self.frame is None:
             logger.error("Can't analyze frame because it doesn't exist")
             return
@@ -175,7 +169,7 @@ class VideoAnalyzer(QObject):
         # Filter artifacts
         mask_black_keys = get_median_filtered_mask([cv2.contourArea(c) for c in contours_black])
         contours_black_valid = [("B", contour) for contour, valid in zip(contours_black, mask_black_keys) if valid]
-        # Sort keys from left to right
+        # Sort contours (ie keys) from left to right
         contours = np.array(
             sorted(
                 [x for x in contours_white_valid + contours_black_valid],
@@ -183,20 +177,17 @@ class VideoAnalyzer(QObject):
             ),
             dtype=object,
         )
-        logger.info(f"number of keys: {len(contours)}")
+        logger.info(f"number of contours: {len(contours)}")
         try:
-            start_note = find_start_note([c[0] for c in contours])
-            logger.info(f"Start note: {start_note}")
+            # The first entry of a contour is either 'W' or 'B'
+            self.start_note = find_start_note([c[0] for c in contours])
+            logger.info(f"Start note: {self.start_note}")
         except Exception:
             logger.info(f"Couldn't find start note, define it yourself")
-            start_note = 0
-        # self.start_note_slider.setValue(start_note)
-        midi_note = 21
-        self.keys = {}
-        for _, contour in contours:
-            self.keys[midi_note] = Key(Note(0), midi_note, self.frame_width, self.frame_height, contour)
-            midi_note += 1
-        self.signal_keys_detected.emit(self.keys)
+            self.start_note = Notes.C
+        self.signal_start_note_updated.emit(self.start_note)
+        # The second entry of a contour are the points that cover its area
+        self.signal_contours_detected.emit([Contour(contour=c[1]) for c in contours])
 
 
 class VideoPlayer(QWidget):
@@ -209,18 +200,20 @@ class VideoPlayer(QWidget):
         super(VideoPlayer, self).__init__()
         layout = QVBoxLayout()
         self.video_analyzer = VideoAnalyzer(width=self.IMAGE_WIDTH, height=self.IMAGE_HEIGHT)
-        self.video_analyzer.signal_keys_detected.connect(self.draw_key_overlay)
+        self.video_analyzer.signal_contours_detected.connect(self.draw_contour_overlay)
 
         self.image_label = LabelWithRubberband()
-        self.image_label.signal_selection_complete.connect(self.video_analyzer.detect_keys)
-        self.image_label.setMinimumHeight(self.IMAGE_HEIGHT)
-        self.image_label.setMinimumWidth(self.IMAGE_WIDTH)
+        self.image_label.signal_selection_complete.connect(self.video_analyzer.detect_contours)
+        self.image_label.setFixedHeight(self.IMAGE_HEIGHT)
+        self.image_label.setFixedWidth(self.IMAGE_WIDTH)
         layout.addWidget(self.image_label)
 
         self.frame_slider = QSlider(orientation=Qt.Horizontal)
+        self.frame_slider.setFixedWidth(self.IMAGE_WIDTH)
         self.frame_slider.setEnabled(False)
         self.frame_slider.valueChanged.connect(self.change_and_draw_frame)
         layout.addWidget(self.frame_slider)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
 
     def load_video(self, path: str):
@@ -251,25 +244,85 @@ class VideoPlayer(QWidget):
         self.video_analyzer.set_frame(cv_frame)
         self.frame = self.convert_cv_qt(cv_frame)
         self.image_label.setPixmap(self.frame)
+        # if key overlay was generated before, draw it again
+        if self.video_analyzer.keys is not None:
+            self.draw_contour_overlay(self.video_analyzer.keys)
 
-    def draw_key_overlay(self, keys: dict[int, Key]):
+    def draw_contour_overlay(self, contours: list[Contour]):
         frame_with_overlay = QPixmap(self.frame)
         with QPainter(frame_with_overlay) as painter:
             painter.setPen("Black")
             brush = QBrush()
             brush.setStyle(Qt.SolidPattern)
-            for key in keys.values():
+            for contour in contours:
                 path = QPainterPath()
-                points = key.as_qpoints(self.image_label)
+                points = contour.as_qpoints(
+                    image=self.image_label,
+                    cap_width=self.video_analyzer.frame_width,
+                    cap_height=self.video_analyzer.frame_height,
+                )
                 path.addPolygon(points)
-                brush.setColor(key.color)
+                brush.setColor(contour.color)
                 painter.fillPath(path, brush)
                 painter.drawPolygon(points)
         self.image_label.setPixmap(frame_with_overlay)
 
 
+class StartNoteSelector(QWidget):
+    signal_start_note_updated = Signal(Notes)
+
+    def __init__(self):
+        super(StartNoteSelector, self).__init__()
+        layout = QGridLayout()
+        self.buttons = {note: QPushButton(note.name, self) for note in Notes}
+        for note, button in self.buttons.items():
+            button.setFixedWidth(20)
+            button.setAutoFillBackground(True)
+            button.clicked.connect(partial(self.clicked, note))
+            layout.addWidget(button, 1, note.value, 1, 1)
+        self.dummy = Color("Blue")
+        layout.addWidget(self.dummy, 2, 0, 1, len(self.buttons))
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+
+    def clicked(self, clicked_note):
+        for note, button in self.buttons.items():
+            pal = QPushButton().palette()
+            if note == clicked_note:
+                pal.setColor(QPalette.Button, "Green")
+            button.setPalette(pal)
+            button.update()
+        self.signal_start_note_updated.emit(clicked_note)
+
+
 class VideoEditPanel(QWidget):
-    pass
+    def __init__(self):
+        super(VideoEditPanel, self).__init__()
+        layout = QVBoxLayout()
+
+        self.lbl_start_note = QLabel("Selected start note:")
+        self.lbl_start_note.setFixedHeight(12)
+        layout.addWidget(self.lbl_start_note)
+
+        self.start_note_selector = StartNoteSelector()
+        layout.addWidget(self.start_note_selector)
+
+        self.lbl_midi_start_note = QLabel("Midi start note:")
+        self.lbl_midi_start_note.setFixedHeight(12)
+        layout.addWidget(self.lbl_midi_start_note)
+
+        self.combo_box_midi_notes = QComboBox()
+        layout.addWidget(self.combo_box_midi_notes)
+        self.start_note_selector.signal_start_note_updated.connect(self.update_combo_box_midi_notes)
+        layout.addWidget(self.start_note_selector)
+        self.setLayout(layout)
+
+    def update_combo_box_midi_notes(self, note):
+        available_notes = [n for n in Noterator() if n.note == note]
+        self.combo_box_midi_notes.clear()
+        for n in available_notes:
+            self.combo_box_midi_notes.addItem(str(n), n)
+        pass
 
 
 class BottomLayout(QWidget):
@@ -280,22 +333,28 @@ class BottomLayout(QWidget):
         self.video_player = VideoPlayer()
         layout.addWidget(self.video_player)
 
-        layout_col1 = QGridLayout()
-        layout_col1.addWidget(QLabel("start note:"), 0, 0, 1, 1)
+        self.video_edit_panel = VideoEditPanel()
+        layout.addWidget(self.video_edit_panel)
+        self.video_player.video_analyzer.signal_start_note_updated.connect(
+            lambda x: self.video_edit_panel.start_note_selector.clicked(x)
+        )
 
-        self.start_note_slider = QSlider(orientation=Qt.Horizontal)
-        self.start_note_slider.setEnabled(False)
-        self.start_note_slider.setMinimum(0)
-        self.start_note_slider.setMaximum(11)
-        self.start_note_slider.setEnabled(False)
-        self.start_note_slider.valueChanged.connect(lambda x: self.start_note_label.setText(Note(x).name))
-        layout_col1.addWidget(self.start_note_slider, 0, 1, 1, 3)
+        # layout_col1 = QGridLayout()
+        # layout_col1.addWidget(QLabel("start note:"), 0, 0, 1, 1)
 
-        self.start_note_label = QLabel(f"{Note(self.start_note_slider.value()).name}")
-        layout_col1.addWidget(self.start_note_label, 0, 4, 1, 1)
+        # self.start_note_slider = QSlider(orientation=Qt.Horizontal)
+        # self.start_note_slider.setEnabled(False)
+        # self.start_note_slider.setMinimum(0)
+        # self.start_note_slider.setMaximum(11)
+        # self.start_note_slider.setEnabled(False)
+        # self.start_note_slider.valueChanged.connect(lambda x: self.start_note_label.setText(Note(x).name))
+        # layout_col1.addWidget(self.start_note_slider, 0, 1, 1, 3)
 
-        layout_col1.setContentsMargins(0, 0, 0, 0)
-        layout.addLayout(layout_col1)
+        # self.start_note_label = QLabel(f"{Note(self.start_note_slider.value()).name}")
+        # layout_col1.addWidget(self.start_note_label, 0, 4, 1, 1)
+
+        # layout_col1.setContentsMargins(0, 0, 0, 0)
+        # layout.addLayout(layout_col1)
 
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
