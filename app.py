@@ -4,7 +4,7 @@ from Color import Color
 from DownloadBar import DownloadBar
 import logging
 
-from VideoPlayer import VideoPlayer
+from VideoPlayer import BottomLayout
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -21,13 +21,13 @@ class MainWindow(QMainWindow):
 
         layout = QGridLayout()
         self.download_bar = DownloadBar()
-        self.video_player = VideoPlayer()
+        self.bottom_layout = BottomLayout()
         # Glue
-        self.download_bar.cb_complete = self.video_player.load_video
+        self.download_bar.signal_download_complete.connect(self.bottom_layout.video_player.load_video)
 
         layout.addWidget(self.download_bar, 0, 0, 1, 3)
         # layout.addWidget(Color('green'), 0, 3)
-        layout.addWidget(self.video_player, 1, 0, 3, 3)
+        layout.addWidget(self.bottom_layout, 1, 0, 3, 3)
         # layout.addWidget(Color("purple"), 2, 1)
 
         widget = QWidget()

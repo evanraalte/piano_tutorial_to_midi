@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QComboBox,
 )
+from PySide6.QtCore import Signal
 from Color import Color
 from pytube import YouTube
 from pytube.helpers import RegexMatchError
@@ -23,6 +24,8 @@ logger.addHandler(logging.NullHandler())
 
 
 class DownloadBar(QWidget):
+    signal_download_complete = Signal(str)
+    signal_download_on_progress = Signal(str)
     DOWNLOAD_PATH = Path("Downloads")
 
     def __init__(self):
@@ -88,14 +91,15 @@ class DownloadBar(QWidget):
             logger.debug("Invalid URL!")
 
     def cb_on_progress(self, chunk: bytes, file_handler: BinaryIO, bytes_remaining: int):
+        self.signal_download_on_progress.emit()
         bytes_done = self.stream.filesize - bytes_remaining
         percent_done = (bytes_done / self.stream.filesize) * 100
         logger.info(f"on_progress: {percent_done:.2f}")
         self.progress_bar.setValue(int(percent_done))
 
     def cb_on_complete(self, stream, file_path: str):
+        self.signal_download_complete.emit(file_path)
         logger.info(f"Saved file to {file_path}")
-        self.cb_complete(file_path)
 
     def download(self):
         logger.info(f"Downloading...")
