@@ -4,7 +4,7 @@ from Color import Color
 from DownloadBar import DownloadBar
 import logging
 
-from VideoPlayer import BottomLayout
+from BottomLayout import BottomLayout
 
 logging.basicConfig(
     level=logging.DEBUG,
