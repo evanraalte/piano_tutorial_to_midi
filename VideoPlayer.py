@@ -30,36 +30,28 @@ class VideoRenderer(QtCore.QObject):
     def set_frame(self, frame_num):
         self.frame_num = frame_num
 
+    def render(self):
+        frame = self.frame_num # Could be updated while rendering
+        self.cap.set(1, frame)
+        _, cv_frame = self.cap.read()    
+        self.finished.emit(cv_frame)
+        self.rendered_frame = frame
+
     def run(self):
         if self.cap is None:
             logger.error("Thread started without a valid capture")
             return
-        while True:
-            # TODO: check if we can do something else than polling
-            current_frame = self.frame_num
-            if current_frame != self.rendered_frame:
-                self.cap.set(1, current_frame)
-                _, cv_frame = self.cap.read()    
-                self.finished.emit(cv_frame)
-                self.rendered_frame = current_frame
-            else:
-                time.sleep(0.1)
+
+        while self.rendered_frame != self.frame_num:
+            self.render()
+
 
 class VideoPlayer(QtWidgets.QWidget):
     """consists of a video frame and a frame slider, along with logic to analyze the frame"""
 
     IMAGE_WIDTH = 1280
     IMAGE_HEIGHT = 720
-    SLIDER_MULTIPLIER = 20
-
-    # @contextlib.contextmanager
-    # def non_blocking_lock(self, lock=Lock()):
-    #     if not lock.acquire(blocking=False):
-    #         raise Exception
-    #     try:
-    #         yield lock
-    #     finally:
-    #         lock.release()
+    SLIDER_MULTIPLIER = 5
 
     def __init__(self):
         super(VideoPlayer, self).__init__()
@@ -128,14 +120,12 @@ class VideoPlayer(QtWidgets.QWidget):
         self.image_label.setPixmap(self.frame)
 
     def request_frame_from_capture(self, slider_value): 
-        # TODO: the frame that is selected when the slider is released is actually most important I'd say. Now it can be dropped because another frame is rendered.
-        # Easy work around is to also render (with block) when the slider is released
-        # A queue where we invalidate all frames but the last is also an option, but when would you decide to re-render? 
-        # maybe update the frame in the worker thread, and keep it running whilst checking if something needs to be changed?
-        # otherwise a 0.1 wait can be done as well
-        # maybe even a signal in the workthread to trigger it.
         frame_num = slider_value * self.SLIDER_MULTIPLIER
         self.worker.set_frame(frame_num)
+
+        # The thread is started again when it previously closed because it was idle and an update is needed
+        if not self.thread.isRunning() and frame_num != self.worker.rendered_frame:
+            self.thread.start()
         
 
     def draw_contour_overlay(self, contours: list[Contour]):
