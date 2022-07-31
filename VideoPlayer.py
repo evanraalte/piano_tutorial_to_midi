@@ -9,6 +9,7 @@ from Contour import Contour
 from VideoAnalyzer import VideoAnalyzer
 from LabelWithRubberband import LabelWithRubberband
 
+from FrameMode import FrameMode
 import logging
 
 logger = logging.getLogger(__name__)
@@ -38,8 +39,15 @@ class VideoPlayer(QtWidgets.QWidget):
         self.frame_slider.setEnabled(False)
         self.frame_slider.valueChanged.connect(self.change_and_draw_frame)
         layout.addWidget(self.frame_slider)
+
+        self.lbl_frame_mode = QtWidgets.QLabel(self.image_label.mode.name)
+        self.image_label.signal_mode_updated.connect(lambda m: self.lbl_frame_mode.setText(m.name))
+        layout.addWidget(self.lbl_frame_mode)
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
+
+    def set_mode(self, mode: FrameMode):
+        self.image_label.mode = mode
 
     def load_video(self, path: str):
         self.frame_slider.setEnabled(False)

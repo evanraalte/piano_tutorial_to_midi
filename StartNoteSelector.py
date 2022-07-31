@@ -23,8 +23,8 @@ class StartNoteSelector(QtWidgets.QWidget):
             button.setAutoFillBackground(True)
             button.clicked.connect(partial(self.clicked, note))
             layout.addWidget(button, 1, note.value, 1, 1)
-        self.dummy = Color("Blue")
-        layout.addWidget(self.dummy, 2, 0, 1, len(self.buttons))
+        # self.dummy = Color("Blue")
+        # layout.addWidget(self.dummy, 2, 0, 1, len(self.buttons))
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
 

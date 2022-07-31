@@ -4,6 +4,7 @@ import PySide6.QtCore as QtCore
 
 from VideoPlayer import VideoPlayer
 from VideoEditPanel import VideoEditPanel
+from FrameMode import FrameMode
 
 import logging
 
@@ -20,6 +21,16 @@ class BottomLayout(QtWidgets.QWidget):
         layout.addWidget(self.video_player)
 
         self.video_edit_panel = VideoEditPanel()
+
+        self.video_edit_panel.btn_frame_select.clicked.connect(
+            lambda x: self.video_player.set_mode(FrameMode.FRAME_SELECT)
+        )
+
+        self.video_edit_panel.color_picker.signal_clicked.connect(
+            lambda: self.video_player.set_mode(FrameMode.COLOR_PICK)
+        )
+        self.video_player.image_label.signal_color_picked.connect(self.video_edit_panel.color_picker.pick_color)
+
         layout.addWidget(self.video_edit_panel)
         self.video_player.video_analyzer.signal_start_note_updated.connect(
             lambda x: self.video_edit_panel.start_note_selector.clicked(x)
