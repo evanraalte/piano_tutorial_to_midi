@@ -1,7 +1,9 @@
+import contextlib
 from dataclasses import dataclass, field
 import time
+from tkinter import Frame
 import cv2
-
+from threading import Lock, Thread
 import PySide6.QtGui as QtGui
 import PySide6.QtWidgets as QtWidgets
 import PySide6.QtCore as QtCore
@@ -12,10 +14,36 @@ from LabelWithRubberband import LabelWithRubberband
 
 from FrameMode import FrameMode
 import logging
-
+import numpy as np
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+class VideoRenderer(QtCore.QObject):
+    finished = QtCore.Signal(np.ndarray)
+
+    def __init__(self):
+        super(VideoRenderer, self).__init__()
+        self.frame_num = 0
+        self.rendered_frame = None
+        self.cap = None
+    
+    def set_frame(self, frame_num):
+        self.frame_num = frame_num
+
+    def run(self):
+        if self.cap is None:
+            logger.error("Thread started without a valid capture")
+            return
+        while True:
+            # TODO: check if we can do something else than polling
+            current_frame = self.frame_num
+            if current_frame != self.rendered_frame:
+                self.cap.set(1, current_frame)
+                _, cv_frame = self.cap.read()    
+                self.finished.emit(cv_frame)
+                self.rendered_frame = current_frame
+            else:
+                time.sleep(0.1)
 
 class VideoPlayer(QtWidgets.QWidget):
     """consists of a video frame and a frame slider, along with logic to analyze the frame"""
@@ -23,6 +51,15 @@ class VideoPlayer(QtWidgets.QWidget):
     IMAGE_WIDTH = 1280
     IMAGE_HEIGHT = 720
     SLIDER_MULTIPLIER = 20
+
+    # @contextlib.contextmanager
+    # def non_blocking_lock(self, lock=Lock()):
+    #     if not lock.acquire(blocking=False):
+    #         raise Exception
+    #     try:
+    #         yield lock
+    #     finally:
+    #         lock.release()
 
     def __init__(self):
         super(VideoPlayer, self).__init__()
@@ -39,7 +76,7 @@ class VideoPlayer(QtWidgets.QWidget):
         self.frame_slider = QtWidgets.QSlider(orientation=QtCore.Qt.Horizontal)
         self.frame_slider.setFixedWidth(self.IMAGE_WIDTH)
         self.frame_slider.setEnabled(False)
-        self.frame_slider.valueChanged.connect(self.change_and_draw_frame)
+        self.frame_slider.valueChanged.connect(self.request_frame_from_capture)
         layout.addWidget(self.frame_slider)
 
         self.lbl_frame_mode = QtWidgets.QLabel(self.image_label.mode.name)
@@ -48,6 +85,16 @@ class VideoPlayer(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
 
+        self.thread = QtCore.QThread()
+        self.worker = VideoRenderer()
+        self.worker.finished.connect(self.draw_cv_image)
+        self.worker.finished.connect(self.thread.quit)
+        self.thread.started.connect(self.worker.run)
+        self.worker.moveToThread(self.thread)
+        
+        
+
+
     def set_mode(self, mode: FrameMode):
         self.image_label.mode = mode
 
@@ -55,12 +102,14 @@ class VideoPlayer(QtWidgets.QWidget):
         self.frame_slider.setEnabled(False)
         # self.start_note_slider.setEnabled(False)
         self.cap = cv2.VideoCapture(str(path))
+        self.worker.cap = self.cap
+        self.thread.start()
         self.frame_slider.setMinimum(0)
         self.frame_slider.setMaximum(self.cap.get(7) / self.SLIDER_MULTIPLIER)
         self.frame_slider.setValue(0)
         self.frame_slider.setEnabled(True)
         # self.start_note_slider.setEnabled(True)
-        self.change_and_draw_frame(self.frame_slider.value())
+        self.request_frame_from_capture(self.frame_slider.value())
 
     @classmethod
     def convert_cv_qt(cls, cv_img) -> QtGui.QPixmap:
@@ -72,19 +121,22 @@ class VideoPlayer(QtWidgets.QWidget):
         p = convert_to_Qt_format.scaled(cls.IMAGE_WIDTH, cls.IMAGE_HEIGHT, QtCore.Qt.KeepAspectRatio)
         return QtGui.QPixmap.fromImage(p)
 
-    def change_and_draw_frame(self, slider_value):
-        frame_num = slider_value * self.SLIDER_MULTIPLIER
-        logger.info(frame_num)
-        start_time = time.process_time()
-        self.cap.set(1, frame_num)
-        _, cv_frame = self.cap.read()
+
+    def draw_cv_image(self, cv_frame):
         self.video_analyzer.set_frame(cv_frame)
         self.frame = self.convert_cv_qt(cv_frame)
         self.image_label.setPixmap(self.frame)
-        logger.info(f"Drawing frame {frame_num} took {time.process_time()-start_time} seconds")
-        # if key overlay was generated before, draw it again
-        # if self.video_analyzer.keys is not None:
-        #     self.draw_contour_overlay(self.video_analyzer.keys)
+
+    def request_frame_from_capture(self, slider_value): 
+        # TODO: the frame that is selected when the slider is released is actually most important I'd say. Now it can be dropped because another frame is rendered.
+        # Easy work around is to also render (with block) when the slider is released
+        # A queue where we invalidate all frames but the last is also an option, but when would you decide to re-render? 
+        # maybe update the frame in the worker thread, and keep it running whilst checking if something needs to be changed?
+        # otherwise a 0.1 wait can be done as well
+        # maybe even a signal in the workthread to trigger it.
+        frame_num = slider_value * self.SLIDER_MULTIPLIER
+        self.worker.set_frame(frame_num)
+        
 
     def draw_contour_overlay(self, contours: list[Contour]):
         frame_with_overlay = QtGui.QPixmap(self.frame)
