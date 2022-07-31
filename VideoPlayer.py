@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import time
 import cv2
 
 import PySide6.QtGui as QtGui
@@ -21,6 +22,7 @@ class VideoPlayer(QtWidgets.QWidget):
 
     IMAGE_WIDTH = 1280
     IMAGE_HEIGHT = 720
+    SLIDER_MULTIPLIER = 20
 
     def __init__(self):
         super(VideoPlayer, self).__init__()
@@ -54,7 +56,7 @@ class VideoPlayer(QtWidgets.QWidget):
         # self.start_note_slider.setEnabled(False)
         self.cap = cv2.VideoCapture(str(path))
         self.frame_slider.setMinimum(0)
-        self.frame_slider.setMaximum(self.cap.get(7))
+        self.frame_slider.setMaximum(self.cap.get(7) / self.SLIDER_MULTIPLIER)
         self.frame_slider.setValue(0)
         self.frame_slider.setEnabled(True)
         # self.start_note_slider.setEnabled(True)
@@ -70,16 +72,19 @@ class VideoPlayer(QtWidgets.QWidget):
         p = convert_to_Qt_format.scaled(cls.IMAGE_WIDTH, cls.IMAGE_HEIGHT, QtCore.Qt.KeepAspectRatio)
         return QtGui.QPixmap.fromImage(p)
 
-    def change_and_draw_frame(self, frame_num):
+    def change_and_draw_frame(self, slider_value):
+        frame_num = slider_value * self.SLIDER_MULTIPLIER
         logger.info(frame_num)
+        start_time = time.process_time()
         self.cap.set(1, frame_num)
         _, cv_frame = self.cap.read()
         self.video_analyzer.set_frame(cv_frame)
         self.frame = self.convert_cv_qt(cv_frame)
         self.image_label.setPixmap(self.frame)
+        logger.info(f"Drawing frame {frame_num} took {time.process_time()-start_time} seconds")
         # if key overlay was generated before, draw it again
-        if self.video_analyzer.keys is not None:
-            self.draw_contour_overlay(self.video_analyzer.keys)
+        # if self.video_analyzer.keys is not None:
+        #     self.draw_contour_overlay(self.video_analyzer.keys)
 
     def draw_contour_overlay(self, contours: list[Contour]):
         frame_with_overlay = QtGui.QPixmap(self.frame)
