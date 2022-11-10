@@ -24,11 +24,31 @@ The flow is therefore:
 I started learning myself piano 3 years ago. My best motivation is to play songs that I like. Unfortunately some contemporary music is not available in sheet music. However, there are some nice folks that play songs and show you the bars (Guitar hero style) on YouTube, which is very useful! I still prefer to read sheet music, as it allows me to read the piece in my own pace, without screens, instead of having to scroll through a video. Unfortunately many people don't make/sell the accompanying sheet music. That is where I figured that I could jump in! There were some tools out there that did something similar, but there was none with a good user interface. Besides, I never did graphical user interfaces myself, so it was a good learning experience!
 
 ### Running the application
-I have only tested this in Linux. Please let me know if you have any issues running the application, and I will look into it!
+I have only tested this in Linux (Fedora 36) and [WSL 2.0](https://learn.microsoft.com/en-us/windows/wsl/install) (Ubuntu, with X11 forwarding). Please let me know if you have any issues running the application, and I will look into it!
 
-To run the application
+To run the application on Linux, first install `Python3`, `pip` and the opencv dependencies:
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install python3 
+sudo apt install python3-pip
+sudo apt install python3-opencv
+sudo apt install libegl1
+```
+Then you can install the required Python packages:
 ```bash
 pip3 install -r requirements.txt 
-python3 App.py
+```
+
+Optionally run it in venv (recommended):
+```bash
+python3 -m pip install virtualenv
+python3 -m virtualenv env
+source env/bin/activate
+python3 -m pip install -r requirements.txt 
+```
+
+Finally run the application:
+```bash
+python3 main.py
 ```
 
