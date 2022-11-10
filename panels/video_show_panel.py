@@ -1,4 +1,3 @@
-from tkinter import Frame
 import PySide6.QtWidgets as QtWidgets
 import PySide6.QtCore as QtCore
 from modules.video_player import VideoPlayer
