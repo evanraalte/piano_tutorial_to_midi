@@ -8,15 +8,30 @@ on:
 
 name: Release software for all major operating systems
 jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+    - run: pip install -r requirements.txt pyinstaller
+    - run: pyinstaller main.py --onefile
+    - uses: actions/upload-artifact@v2
+      with:
+        path: dist/*
+        name: ${{ matrix.os }}
   deploy:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - uses: dawidd6/action-download-artifact@v2
-      with:
-        workflow: actions.yml
-        path: dist
-        workflow_conclusion: success
+  - uses: actions/download-artifact@v3
+    with:
+      path: dist
     # - name: Create Release
     #   id: create_release
     #   uses: actions/create-release@v1
@@ -38,7 +53,3 @@ jobs:
         hub release create "${assets[@]}" -m "$tag_name" "$tag_name"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-for file in Nature_Set_*/*.jpg; do
-    mv "$file" "folder/${file/\//_}"
-done
