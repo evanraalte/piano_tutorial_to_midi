@@ -27,6 +27,7 @@ jobs:
     #     release_name: Release ${{ github.ref }}
     #     draft: false
     #     prerelease: false
+    - run: find ./dist/ -type f -print0
     - run: find ./dist/ -type f -print0 | xargs -0 mv -t ./dist/
     - run: |
         set -x
