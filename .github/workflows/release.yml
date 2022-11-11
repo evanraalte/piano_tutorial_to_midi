@@ -22,7 +22,7 @@ jobs:
       with:
         python-version: '3.11'
     - run: pip install -r requirements.txt pyinstaller
-    - run: pyinstaller main.py --onefile
+    - run: pyinstaller main.py --onefile --name piano_to_midi_${{matrix.os}}
     - uses: actions/upload-artifact@v2
       with:
         path: dist/*
@@ -49,11 +49,11 @@ jobs:
     #     release_name: Release ${{ github.ref }}
     #     draft: false
     #     prerelease: false
-    - run: for file in $(find ./dist/ -type f); do cp $file $(echo $file | tr / _) ; done
+    # - run: for file in $(find ./dist -type f); do cp $file "${$(echo $file | tr / _):2}" ; done
     - run: |
         set -x
         assets=()
-        for asset in ./dist_*; do
+        for asset in $(find dist -type f); do
           assets+=("-a" "$asset")
         done
         tag_name="${GITHUB_REF##*/}"
