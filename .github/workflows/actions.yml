@@ -1,6 +1,10 @@
 on:
   pull_request:
   workflow_dispatch:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -19,3 +23,39 @@ jobs:
       with:
         path: dist/*
         name: ${{ matrix.os }}
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@master
+      with:
+        name: windows-latest
+        path: piano_to_midi_windows.exe
+    - uses: actions/download-artifact@master
+      with:
+        name: ubuntu-latest
+        path: piano_to_midi_linux
+    - uses: actions/download-artifact@master
+      with:
+        name: macos-latest
+        path: piano_to_midi_mac
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+    - name: Upload Release Asset
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: '*'
+        asset_name: piano_to_midi
+        asset_content_type: application/zip
