@@ -49,7 +49,7 @@ jobs:
     #     release_name: Release ${{ github.ref }}
     #     draft: false
     #     prerelease: false
-    - run: for file in $(find ./dists/ -type f); do cp $file $(echo $file | tr / _) ; done
+    - run: for file in $(find ./dist/ -type f); do cp $file $(echo $file | tr / _) ; done
     - run: |
         set -x
         assets=()
