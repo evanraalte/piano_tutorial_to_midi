@@ -11,9 +11,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@v2
     - uses: dawidd6/action-download-artifact@v2
       with:
         workflow: actions.yml
+        path: dist
         workflow_conclusion: success
     # - name: Create Release
     #   id: create_release
@@ -28,7 +30,7 @@ jobs:
     - run: |
         set -x
         assets=()
-        for asset in ./*; do
+        for asset in ./dist/*; do
           assets+=("-a" "$asset")
         done
         tag_name="${GITHUB_REF##*/}"
