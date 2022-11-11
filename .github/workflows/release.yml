@@ -27,7 +27,8 @@ jobs:
         name: ${{ matrix.os }}
   deploy:
     runs-on: ubuntu-latest
-    if: startsWith(github.event.ref, 'refs/tags/v')
+    needs: build
+    # if: startsWith(github.event.ref, 'refs/tags/v')
     steps:
     - uses: actions/checkout@v2
     - uses: actions/download-artifact@v3
