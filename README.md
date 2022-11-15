@@ -23,10 +23,13 @@ The flow is therefore:
 ### Motivation
 I started learning myself piano 3 years ago. My best motivation is to play songs that I like. Unfortunately some contemporary music is not available in sheet music. However, there are some nice folks that play songs and show you the bars (Guitar hero style) on YouTube, which is very useful! I still prefer to read sheet music, as it allows me to read the piece in my own pace, without screens, instead of having to scroll through a video. Unfortunately many people don't make/sell the accompanying sheet music. That is where I figured that I could jump in! There were some tools out there that did something similar, but there was none with a good user interface. Besides, I never did graphical user interfaces myself, so it was a good learning experience!
 
-### Running the application
+### Running the application from precompiled binaries
+I have admit that I am new at this, but I now included binaries for all major OS's on the [releases](https://github.com/evanraalte/piano_tutorial_to_midi/releases) page of this repository. Let me know if anything doesn't work as expected :).
+
+### Running the application from source
 I have only tested this in Linux (Fedora 36) and [WSL 2.0](https://learn.microsoft.com/en-us/windows/wsl/install) (Ubuntu, with X11 forwarding). Please let me know if you have any issues running the application, and I will look into it!
 
-To run the application on Linux, first install `Python3`, `pip` and the opencv dependencies:
+To run the application on Linux or WSL, first install `Python3`, `pip` and the opencv dependencies:
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install python3 
@@ -34,6 +37,9 @@ sudo apt install python3-pip
 sudo apt install python3-opencv
 sudo apt install libegl1
 ```
+
+On Mac, make sure to issue a certificate: https://stackoverflow.com/questions/68275857/urllib-error-urlerror-urlopen-error-ssl-certificate-verify-failed-certifica. This required for downloading youtube videos. Apart from that, there are no additional requirements on mac, apart from having the developer tools.
+
 Then you can install the required Python packages:
 ```bash
 pip3 install -r requirements.txt 

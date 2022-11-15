@@ -21,7 +21,7 @@ class VideoPlayer(QtWidgets.QWidget):
 
     IMAGE_WIDTH = 1280
     IMAGE_HEIGHT = 720
-    SLIDER_MULTIPLIER = 5
+    SLIDER_MULTIPLIER = 1
 
     signal_video_loaded = QtCore.Signal()
     signal_frame_selected = QtCore.Signal()
@@ -91,11 +91,14 @@ class VideoPlayer(QtWidgets.QWidget):
         return QtGui.QPixmap.fromImage(p)
 
     def draw_cv_image(self, cv_frame):
-        print("Drawing")
-        self.video_analyzer.set_frame(cv_frame)
-        self.frame = self.convert_cv_qt(cv_frame)
-        self.image_label.setPixmap(self.frame)
-
+        # print("Drawing")
+        try:
+            self.video_analyzer.set_frame(cv_frame)
+            self.frame = self.convert_cv_qt(cv_frame)
+            self.image_label.setPixmap(self.frame)
+        except cv2.error:
+            logger.debug("Detected an empty frame, skipping")
+            pass
     def request_frame_from_capture(self, slider_value):
         frame_num = slider_value * self.SLIDER_MULTIPLIER
         self.worker.set_frame(frame_num)

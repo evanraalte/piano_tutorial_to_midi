@@ -16,7 +16,7 @@ class Contour:
     SATURATION_MAX = 255
     contour: np.array
 
-    color: QtGui.QColor = field(init=False, default=QtGui.QColor.fromHsl(29, 255, 127))
+    color: QtGui.QColor = field(init=False, default_factory=lambda: QtGui.QColor.fromHsl(29, 255, 127))
 
     def __post_init__(self):
         pass

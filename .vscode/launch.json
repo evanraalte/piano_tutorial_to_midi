@@ -8,7 +8,7 @@
             "name": "App",
             "type": "python",
             "request": "launch",
-            "program": "app.py",
+            "program": "main.py",
             "console": "integratedTerminal",
             "justMyCode": true
         },
