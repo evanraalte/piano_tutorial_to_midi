@@ -1,5 +1,4 @@
 pyside6
 pytube
-opencv-python
 PyYAML
 mido

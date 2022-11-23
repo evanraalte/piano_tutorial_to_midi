@@ -1,2 +1,4 @@
 __pycache__
 Downloads
+build/**
+dist/**

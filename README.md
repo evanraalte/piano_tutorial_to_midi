@@ -38,7 +38,7 @@ sudo apt install python3-opencv
 sudo apt install libegl1
 ```
 
-On Mac, make sure to issue a certificate: https://stackoverflow.com/questions/68275857/urllib-error-urlerror-urlopen-error-ssl-certificate-verify-failed-certifica. This required for downloading youtube videos. Apart from that, there are no additional requirements on mac, apart from having the developer tools.
+On Mac, make sure to issue a certificate: https://stackoverflow.com/questions/68275857/urllib-error-urlerror-urlopen-error-ssl-certificate-verify-failed-certifica. This required for downloading youtube videos. Apart from that, there are no additional requirements on mac, apart from having the developer tools.e`
 
 Then you can install the required Python packages:
 ```bash

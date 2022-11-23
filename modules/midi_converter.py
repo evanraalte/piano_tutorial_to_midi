@@ -86,16 +86,22 @@ class MidiConverter:
     def save(self, name):
         self.mid.save(name)
 
+
+
     def process_frame(self):
         frame_num = self.cap.get(cv2.CAP_PROP_POS_FRAMES)
         ret, frame = self.cap.read()
+        self.process_frame_arg(frame)
+
+    def process_frame_arg(self, frame):
         # Convert the image to HLS
+        # while True:
         frame_hls = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
         # Calculate the mean color of every key
         means = {piano_key : cv2.mean(frame_hls, mask=self.masks[piano_key]) for piano_key in range(len(self.config.key_contours))}
         # Obtain which keys are pressed by which hand
         pressed_keys = set(self.matches_reference_key_color(key, mean) for key, mean in means.items() if self.matches_reference_key_color(key, mean) is not None)
-
+        return pressed_keys
         # Update the state and transmit the midi events
         self.update_state(pressed_keys, frame_num)
         
